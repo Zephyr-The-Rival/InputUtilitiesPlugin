@@ -20,6 +20,7 @@ void AInputUtilityWorldPrompt::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializePrompt();
+	GetGameInstance()->GetSubsystem<UInputUtilitySubsystem>()->ReinitializePrompts.AddDynamic(this,&AInputUtilityWorldPrompt::InitializePrompt);
 }
 
 void AInputUtilityWorldPrompt::OnConstruction(const FTransform& Transform)

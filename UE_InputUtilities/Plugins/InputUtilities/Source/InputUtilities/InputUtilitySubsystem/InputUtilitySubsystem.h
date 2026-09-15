@@ -4,11 +4,26 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Framework/Application/IInputProcessor.h"
 #include "InputUtilitySubsystem.generated.h"
 
-class UTexture2D;
-class UInputAction;
-class UInputMappingContext;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FReinitializePromptsEvent);
+
+class UInputUtilitySubsystem;
+
+class FInputUtilitiesInputProcessor : public IInputProcessor
+{
+public:
+	FInputUtilitiesInputProcessor(UInputUtilitySubsystem* InSubsystem) : Subsystem(InSubsystem) {}
+
+	virtual void Tick(const float DeltaTime, FSlateApplication& SlateApp, TSharedRef<ICursor> Cursor) override {}
+
+	virtual bool HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override;
+	virtual bool HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override;
+
+private:
+	TWeakObjectPtr<UInputUtilitySubsystem> Subsystem;
+};
 
 UCLASS()
 class INPUTUTILITIES_API UInputUtilitySubsystem : public UGameInstanceSubsystem
@@ -17,14 +32,18 @@ class INPUTUTILITIES_API UInputUtilitySubsystem : public UGameInstanceSubsystem
 
 public:
 	bool bGamepadIsBeingUsed = false;
-	
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
 	void OnAnyKeyPressed(FKey Key);
-	void OnWorldInitialized(const UWorld::FActorsInitializedParams& Params);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
 	void SetUseAlternativeGamepadTexture(bool bNewValue);
+	
+	FReinitializePromptsEvent ReinitializePrompts;
 
 private:
 	bool bUseAlternativeGamepadTexture = false;
+	TSharedPtr<FInputUtilitiesInputProcessor> InputProcessor;
 };

@@ -2,41 +2,48 @@
 
 
 #include "InputUtilitySubsystem.h"
+#include "Framework/Application/SlateApplication.h"
+
+bool FInputUtilitiesInputProcessor::HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
+{
+	if (Subsystem.IsValid())
+		Subsystem->OnAnyKeyPressed(InKeyEvent.GetKey());
+	return false;
+}
+
+bool FInputUtilitiesInputProcessor::HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent)
+{
+	if (Subsystem.IsValid())
+		Subsystem->OnAnyKeyPressed(MouseEvent.GetEffectingButton());
+	return false;
+}
 
 void UInputUtilitySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	FWorldDelegates::OnWorldInitializedActors.AddUObject(this, &UInputUtilitySubsystem::OnWorldInitialized);
+	UE_LOG(LogTemp, Warning, TEXT("InputUtilitySubsystem: Initialize called"));
+	UE_LOG(LogTemp, Warning, TEXT("InputUtilitySubsystem: Slate initialized = %s"), FSlateApplication::IsInitialized() ? TEXT("true") : TEXT("false"));
+
+	InputProcessor = MakeShared<FInputUtilitiesInputProcessor>(this);
+	bool bRegistered = FSlateApplication::Get().RegisterInputPreProcessor(InputProcessor);
+	UE_LOG(LogTemp, Warning, TEXT("InputUtilitySubsystem: Processor registered = %s"), bRegistered ? TEXT("true") : TEXT("false"));
+}
+
+void UInputUtilitySubsystem::Deinitialize()
+{
+	if (FSlateApplication::IsInitialized() && InputProcessor.IsValid())
+		FSlateApplication::Get().UnregisterInputPreProcessor(InputProcessor);
+
+	Super::Deinitialize();
 }
 
 void UInputUtilitySubsystem::OnAnyKeyPressed(FKey Key)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UInputUtilitySubsystem::OnAnyKeyPressed"));
-	bGamepadIsBeingUsed = Key.IsGamepadKey();
-}
-
-void UInputUtilitySubsystem::OnWorldInitialized(const UWorld::FActorsInitializedParams& Params)
-{
-	APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController(Params.World);
-	if (!PC || !PC->InputComponent)
+	if (bGamepadIsBeingUsed != Key.IsGamepadKey())
 	{
-		// PC not ready yet, bind to tick or PostLogin
-		Params.World->GetTimerManager().SetTimerForNextTick([this, World = Params.World]()
-		{
-			APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController(World);
-			if (PC && PC->InputComponent)
-			{
-				FInputKeyBinding KB(EKeys::AnyKey, IE_Pressed);
-				KB.KeyDelegate.BindDelegate(this, &UInputUtilitySubsystem::OnAnyKeyPressed);
-				PC->InputComponent->KeyBindings.Add(KB);
-			}
-		});
-		return;
+		bGamepadIsBeingUsed = Key.IsGamepadKey();
+		ReinitializePrompts.Broadcast();
 	}
-
-	FInputKeyBinding KB(EKeys::AnyKey, IE_Pressed);
-	KB.KeyDelegate.BindDelegate(this, &UInputUtilitySubsystem::OnAnyKeyPressed);
-	PC->InputComponent->KeyBindings.Add(KB);
 }
 
 void UInputUtilitySubsystem::SetUseAlternativeGamepadTexture(bool bNewValue)

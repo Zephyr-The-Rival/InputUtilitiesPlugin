@@ -3,34 +3,19 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "InputUtilityWorldPrompt.generated.h"
+#include "Blueprint/UserWidget.h"
+#include "WidgetPrompt.generated.h"
 
+class UImage;
 class UInputAction;
 class UInputMappingContext;
 class UTexture2D;
 
 UCLASS(Blueprintable)
-class INPUTUTILITIES_API AInputUtilityWorldPrompt : public AActor
+class INPUTUTILITIES_API UWidgetPrompt : public UUserWidget
 {
 	GENERATED_BODY()
-
 public:
-	AInputUtilityWorldPrompt();
-	virtual void OnConstruction(const FTransform& Transform) override;
-
-protected:
-	virtual void BeginPlay() override;
-	
-
-
-public:
-	virtual void Tick(float DeltaTime) override;
-
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input Prompt")
-	UStaticMeshComponent* Plane;
-	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input Prompt")
 	UInputAction* Action;
 
@@ -42,10 +27,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input Prompt")
 	UTexture2D* OverrideMakTexture;
-	
+
+protected:
+	UPROPERTY(meta=(BindWidget))
+	UImage* PromptImage;
+
+	virtual void NativeConstruct() override;
+	virtual void NativePreConstruct() override;
+
 private:
 	UFUNCTION()
 	void InitializePrompt();
-	
-	UMaterialInstanceDynamic* DynMat;
 };
