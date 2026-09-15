@@ -1,0 +1,15 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.InputUtilities.cpp.obj": [
+			"InputUtilities.init.gen.cpp.obj",
+			"InputUtilitiesFunctionLibrary.gen.cpp.obj",
+			"InputUtilitySubsystem.gen.cpp.obj",
+			"InputUtilityWorldPrompt.gen.cpp.obj",
+			"InputUtilitiesFunctionLibrary.cpp.obj",
+			"InputUtilities.cpp.obj",
+			"InputUtilitySubsystem.cpp.obj",
+			"InputUtilityWorldPrompt.cpp.obj"
+		]
+	}
+}
