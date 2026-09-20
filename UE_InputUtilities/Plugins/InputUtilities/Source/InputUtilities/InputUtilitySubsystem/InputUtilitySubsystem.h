@@ -7,6 +7,8 @@
 #include "Framework/Application/IInputProcessor.h"
 #include "InputUtilitySubsystem.generated.h"
 
+class UMappingSave;
+struct FSavedMapping;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FReinitializePromptsEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAnyKeyPressedEvent, FKey, Key);
 
@@ -57,4 +59,20 @@ public:
 private:
 	bool bUseAlternativeGamepadTextures = false;
 	TSharedPtr<FInputUtilitiesInputProcessor> InputProcessor;
+	
+	
+	//Saving
+public:
+
+	UFUNCTION(BlueprintCallable)
+	void SaveMapping(FSavedMapping NewMapping);
+	UMappingSave* LoadMappingSaveObj();
+	void ApplyMappingSave(UMappingSave* MappingSave);
+	
+private:
+	FString MappingSaveName = "Saved Input Mappings";
+	UMappingSave* MappingSaveObj = nullptr;
+	
+	//returns -1 if not found
+	int32 FindMappingInSavedArray(FSavedMapping NewMapping);
 };
