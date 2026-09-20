@@ -6,39 +6,31 @@
 #include "InputUtilities/FunctionLibrary/InputUtilitiesFunctionLibrary.h"
 #include "InputUtilities/InputUtilitySubsystem/InputUtilitySubsystem.h"
 
-void UWidgetPrompt::NativeConstruct()
+void UWidgetPrompt::Reinitialize()
 {
-	Super::NativeConstruct();
-	InitializePrompt();
-
-	UInputUtilitySubsystem* Subsystem = GetGameInstance()->GetSubsystem<UInputUtilitySubsystem>();
-	if (Subsystem)
-		Subsystem->ReinitializePrompts.AddDynamic(this, &UWidgetPrompt::InitializePrompt);
-}
-
-void UWidgetPrompt::NativePreConstruct()
-{
-	Super::NativePreConstruct();
-	InitializePrompt();
-}
-
-void UWidgetPrompt::InitializePrompt()
-{
+	Super::Reinitialize();
 	if (!PromptImage)
 		return;
 
 	bool bUseGamepad = false;
-
-	UGameInstance* GameInstance = GetGameInstance();
-	if (GameInstance)
+	bool bUseAlternative = false;
+	
+	if (UGameInstance* GameInstance = GetGameInstance()) 
 	{
-		UInputUtilitySubsystem* Subsystem = GameInstance->GetSubsystem<UInputUtilitySubsystem>();
-		if (Subsystem)
+		if (UInputUtilitySubsystem* Subsystem = GameInstance->GetSubsystem<UInputUtilitySubsystem>())
+		{
 			bUseGamepad = Subsystem->bGamepadIsBeingUsed;
+			bUseAlternative = Subsystem->GetUseAlternativeGamepadTextures();
+		}
 	}
 
 	UTexture2D* Texture = UInputUtilitiesFunctionLibrary::GetTextureForMappedAction(
-		Action, MappingContext, OverrideGamepadTexture, OverrideMakTexture, bUseGamepad);
+		Action,
+		MappingContext,
+		bUseGamepad,
+		bUseAlternative,
+		OverrideGamepadTexture,
+		OverrideMakTexture);
 
 	if (Texture)
 		PromptImage->SetBrushFromTexture(Texture);

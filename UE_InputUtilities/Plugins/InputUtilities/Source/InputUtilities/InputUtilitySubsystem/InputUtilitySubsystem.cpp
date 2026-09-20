@@ -39,14 +39,21 @@ void UInputUtilitySubsystem::Deinitialize()
 
 void UInputUtilitySubsystem::OnAnyKeyPressed(FKey Key)
 {
+	OnAnyKeyPressedEvent.Broadcast(Key);
+
 	if (bGamepadIsBeingUsed != Key.IsGamepadKey())
 	{
 		bGamepadIsBeingUsed = Key.IsGamepadKey();
-		ReinitializePrompts.Broadcast();
+		TriggerRefresh();
 	}
+}
+
+void UInputUtilitySubsystem::TriggerRefresh()
+{
+	ReinitializePrompts.Broadcast();
 }
 
 void UInputUtilitySubsystem::SetUseAlternativeGamepadTexture(bool bNewValue)
 {
-	bUseAlternativeGamepadTexture = bNewValue;
+	bUseAlternativeGamepadTextures = bNewValue;
 }

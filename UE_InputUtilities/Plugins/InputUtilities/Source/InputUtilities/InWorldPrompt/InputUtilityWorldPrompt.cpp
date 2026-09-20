@@ -20,7 +20,9 @@ void AInputUtilityWorldPrompt::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializePrompt();
-	GetGameInstance()->GetSubsystem<UInputUtilitySubsystem>()->ReinitializePrompts.AddDynamic(this,&AInputUtilityWorldPrompt::InitializePrompt);
+	
+	if (UInputUtilitySubsystem* Subsystem = GetGameInstance()->GetSubsystem<UInputUtilitySubsystem>())
+		Subsystem->ReinitializePrompts.AddDynamic(this, &AInputUtilityWorldPrompt::InitializePrompt);
 }
 
 void AInputUtilityWorldPrompt::OnConstruction(const FTransform& Transform)
@@ -37,26 +39,30 @@ void AInputUtilityWorldPrompt::Tick(float DeltaTime)
 
 void AInputUtilityWorldPrompt::InitializePrompt()
 {
-	
 	bool bUseGamepad = false;
 	bool bUseAlternative = false;
-	
-	UGameInstance* gameInstance = GetGameInstance();
-	
-	if (gameInstance)
+
+	if (UGameInstance* GameInstance = GetGameInstance())
 	{
-		UInputUtilitySubsystem* subsystem= gameInstance->GetSubsystem<UInputUtilitySubsystem>();
-		if (subsystem)
+		if (UInputUtilitySubsystem* Subsystem = GameInstance->GetSubsystem<UInputUtilitySubsystem>())
 		{
-			bUseGamepad = gameInstance->GetSubsystem<UInputUtilitySubsystem>()->bGamepadIsBeingUsed;
-			//bUseAlternative= GameInstance->GetSubsystem<UInputUtilitySubsystem>()->bGamepadIsBeingUsed;
+			bUseGamepad = Subsystem->bGamepadIsBeingUsed;
+			bUseAlternative = Subsystem->GetUseAlternativeGamepadTextures();
 		}		
 	}
+	
+	UTexture2D* texture = UInputUtilitiesFunctionLibrary::GetTextureForMappedAction(
+		Action,
+		MappingContext,
+		bUseGamepad,
+		bUseAlternative,
+		OverrideGamepadTexture,
+		OverrideMakTexture);
 	
 	DynMat = Plane->CreateDynamicMaterialInstance(0);
 	if (!DynMat)
 		return;
-	UTexture2D* texture = UInputUtilitiesFunctionLibrary::GetTextureForMappedAction(Action, MappingContext, OverrideGamepadTexture, OverrideMakTexture, bUseGamepad, bUseAlternative);
+	
 	DynMat->SetTextureParameterValue("Texture", texture);
 }
 

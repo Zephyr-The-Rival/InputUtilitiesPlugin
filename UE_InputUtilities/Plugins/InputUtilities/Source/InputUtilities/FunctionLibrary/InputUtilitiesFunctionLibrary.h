@@ -33,7 +33,14 @@ class INPUTUTILITIES_API UInputUtilitiesFunctionLibrary : public UBlueprintFunct
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Input Utilities")
-	static UTexture2D* GetTextureForMappedAction(UInputAction* Action, UInputMappingContext* MappingContext, UTexture2D* OverrideGamepadTexture, UTexture2D* OverrideMakTexture, bool bGamepad, bool bUseAltTexture = false);
+	static UTexture2D* GetTextureForMappedAction(
+		UInputAction* Action,
+		UInputMappingContext* MappingContext,
+		bool bGamepad,
+		bool bUseAltTexture = false,
+		UTexture2D* OverrideGamepadTexture = nullptr,
+		UTexture2D* OverrideMakTexture = nullptr);
 
+	UFUNCTION(BlueprintCallable, Category="Input Utilities")
 	static FKey GetMappedKeyForAction(UInputAction* Action, UInputMappingContext* MappingContext, bool bLookingForGamepadKey);
 };

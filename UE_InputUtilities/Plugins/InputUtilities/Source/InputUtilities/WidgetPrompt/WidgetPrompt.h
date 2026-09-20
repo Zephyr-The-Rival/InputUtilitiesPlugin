@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "InputUtilities/InputUtility_RefreshingWidget.h"
 #include "WidgetPrompt.generated.h"
 
 class UImage;
@@ -12,7 +12,7 @@ class UInputMappingContext;
 class UTexture2D;
 
 UCLASS(Blueprintable)
-class INPUTUTILITIES_API UWidgetPrompt : public UUserWidget
+class INPUTUTILITIES_API UWidgetPrompt : public UInputUtility_RefreshingWidget
 {
 	GENERATED_BODY()
 public:
@@ -31,11 +31,6 @@ public:
 protected:
 	UPROPERTY(meta=(BindWidget))
 	UImage* PromptImage;
-
-	virtual void NativeConstruct() override;
-	virtual void NativePreConstruct() override;
-
-private:
-	UFUNCTION()
-	void InitializePrompt();
+	
+	virtual void Reinitialize() override;
 };

@@ -8,6 +8,7 @@
 #include "InputUtilitySubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FReinitializePromptsEvent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAnyKeyPressedEvent, FKey, Key);
 
 class UInputUtilitySubsystem;
 
@@ -32,18 +33,28 @@ class INPUTUTILITIES_API UInputUtilitySubsystem : public UGameInstanceSubsystem
 
 public:
 	bool bGamepadIsBeingUsed = false;
+	
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
+	bool GetUseAlternativeGamepadTextures() const {return this->bUseAlternativeGamepadTextures;}
+	
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
+	void SetUseAlternativeGamepadTexture(bool bNewValue);
 
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
 	void OnAnyKeyPressed(FKey Key);
-
-	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
-	void SetUseAlternativeGamepadTexture(bool bNewValue);
 	
+	UPROPERTY(BlueprintAssignable, Category="Input Utilities")
 	FReinitializePromptsEvent ReinitializePrompts;
 
+	UPROPERTY(BlueprintAssignable, Category="Input Utilities")
+	FOnAnyKeyPressedEvent OnAnyKeyPressedEvent;
+	
+	UFUNCTION(BlueprintCallable)
+	void TriggerRefresh();
+
 private:
-	bool bUseAlternativeGamepadTexture = false;
+	bool bUseAlternativeGamepadTextures = false;
 	TSharedPtr<FInputUtilitiesInputProcessor> InputProcessor;
 };
