@@ -4,6 +4,7 @@
 #include "InputUtilitySubsystem.h"
 
 #include "InputMappingContext.h"
+#include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
 #include "InputUtilities/Saving/MappingSave.h"
 #include "Kismet/GameplayStatics.h"
@@ -25,24 +26,31 @@ bool FInputUtilitiesInputProcessor::HandleMouseButtonDownEvent(FSlateApplication
 void UInputUtilitySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	UE_LOG(LogTemp, Warning, TEXT("InputUtilitySubsystem: Initialize called"));
-	UE_LOG(LogTemp, Warning, TEXT("InputUtilitySubsystem: Slate initialized = %s"), FSlateApplication::IsInitialized() ? TEXT("true") : TEXT("false"));
 
 	InputProcessor = MakeShared<FInputUtilitiesInputProcessor>(this);
-	bool bRegistered = FSlateApplication::Get().RegisterInputPreProcessor(InputProcessor);
-	UE_LOG(LogTemp, Warning, TEXT("InputUtilitySubsystem: Processor registered = %s"), bRegistered ? TEXT("true") : TEXT("false"));
+	FSlateApplication::Get().RegisterInputPreProcessor(InputProcessor);
 
-
-	this->MappingSaveObj = LoadMappingSaveObj();
-	ApplyMappingSave(MappingSaveObj);
+	MappingSaveObj = LoadMappingSaveObj();
+	FWorldDelegates::OnWorldTickStart.AddUObject(this, &UInputUtilitySubsystem::OnWorldTickStart);
 }
 
 void UInputUtilitySubsystem::Deinitialize()
 {
+	FWorldDelegates::OnWorldTickStart.RemoveAll(this);
+
 	if (FSlateApplication::IsInitialized() && InputProcessor.IsValid())
 		FSlateApplication::Get().UnregisterInputPreProcessor(InputProcessor);
 
 	Super::Deinitialize();
+}
+
+void UInputUtilitySubsystem::OnWorldTickStart(UWorld* InWorld, ELevelTick TickType, float DeltaSeconds)
+{
+	if (!InWorld || !InWorld->IsGameWorld() || !InWorld->HasBegunPlay())
+		return;
+
+	FWorldDelegates::OnWorldTickStart.RemoveAll(this);
+	ApplyMappingSave(MappingSaveObj);
 }
 
 void UInputUtilitySubsystem::OnAnyKeyPressed(FKey Key)
@@ -61,15 +69,62 @@ void UInputUtilitySubsystem::TriggerRefresh()
 	ReinitializePrompts.Broadcast();
 }
 
+bool UInputUtilitySubsystem::SaveOriginalMapping(UInputAction* Action, UInputMappingContext* MappingContext, bool bForGamepad)
+{
+	if (!MappingSaveObj || !Action || !MappingContext)
+		return false;
+
+	FSavedMapping OriginalMapping;
+	OriginalMapping.Action = Action;
+	OriginalMapping.MappingContext = MappingContext;
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+	{
+		if (Mapping.Action == Action && Mapping.Key.IsGamepadKey() == bForGamepad)
+		{
+			OriginalMapping.OriginalKey = Mapping.Key;
+			OriginalMapping.MappedKey = Mapping.Key;
+			break;
+		}
+	}
+
+	if (!OriginalMapping.OriginalKey.IsValid())
+		return false;
+
+	// Defaults are captured only once. SaveMapping will replace this placeholder
+	// with the player's new key while retaining OriginalKey.
+	if (FindMappingInSavedArray(OriginalMapping) != -1)
+		return true;
+
+	MappingSaveObj->SavedMappings.Add(OriginalMapping);
+	return UGameplayStatics::SaveGameToSlot(MappingSaveObj, MappingSaveName, 0);
+}
+
 void UInputUtilitySubsystem::SaveMapping(FSavedMapping NewMapping)
 {
-	if (!MappingSaveObj)
+	if (!MappingSaveObj || !NewMapping.Action || !NewMapping.MappingContext)
 		return;
 
-	//removing old mapping if it exists
-	int index = FindMappingInSavedArray(NewMapping);
-	if (index!=-1)
-		MappingSaveObj->SavedMappings.RemoveAt(index);
+	int32 ExistingIndex = FindMappingInSavedArray(NewMapping);
+	if (ExistingIndex != -1)
+	{
+		// Preserve the original default key from the first save
+		NewMapping.OriginalKey = MappingSaveObj->SavedMappings[ExistingIndex].OriginalKey;
+		MappingSaveObj->SavedMappings.RemoveAt(ExistingIndex);
+	}
+	else if (!NewMapping.OriginalKey.IsValid())
+	{
+		// SaveMapping must be called before the caller changes the mapping context.
+		// At this point, the context still contains the default key we need for reset.
+		for (const FEnhancedActionKeyMapping& M : NewMapping.MappingContext->GetMappings())
+		{
+			if (M.Action == NewMapping.Action && M.Key.IsGamepadKey() == NewMapping.MappedKey.IsGamepadKey())
+			{
+				NewMapping.OriginalKey = M.Key;
+				break;
+			}
+		}
+	}
 
 	MappingSaveObj->SavedMappings.Add(NewMapping);
 	UGameplayStatics::SaveGameToSlot(MappingSaveObj, MappingSaveName, 0);
@@ -85,31 +140,58 @@ UMappingSave* UInputUtilitySubsystem::LoadMappingSaveObj()
 
 void UInputUtilitySubsystem::ApplyMappingSave(UMappingSave* MappingSave)
 {
+	if (!MappingSave)
+		return;
+
 	for (const FSavedMapping& MappingToApply : MappingSave->SavedMappings)
 	{
 		UInputMappingContext* MappingContext = MappingToApply.MappingContext;
-		if (!MappingContext)
+		if (!MappingContext || !MappingToApply.Action || !MappingToApply.MappedKey.IsValid())
 			continue;
 
-		FKey OldKey;
-		bool bFound = false;
-
-		for (const FEnhancedActionKeyMapping& M : MappingContext->GetMappings())
+		// The original key identifies the exact mapping to replace.  Matching only
+		// by keyboard/gamepad type would replace the wrong binding when an action
+		// has multiple keyboard or controller bindings.
+		if (MappingToApply.OriginalKey.IsValid())
 		{
-			if (M.Action == MappingToApply.Action && M.Key.IsGamepadKey() == MappingToApply.MappedKey.IsGamepadKey())
+			MappingContext->UnmapKey(MappingToApply.Action, MappingToApply.OriginalKey);
+			MappingContext->MapKey(MappingToApply.Action, MappingToApply.MappedKey);
+		}
+	}
+	TriggerRefresh();
+}
+
+void UInputUtilitySubsystem::ResetMappingsToDefault()
+{
+	if (bInProcessOfRemappingKey)
+		return;
+	
+	for (const FSavedMapping& Saved : MappingSaveObj->SavedMappings)
+	{
+		if (!Saved.MappingContext || !Saved.Action || !Saved.MappedKey.IsValid() || !Saved.OriginalKey.IsValid())
+			continue;
+
+		// Remove the exact user-selected key, rather than the first binding with
+		// the same device type. This keeps secondary bindings intact.
+		Saved.MappingContext->UnmapKey(Saved.Action, Saved.MappedKey);
+
+		bool bDefaultMappingAlreadyExists = false;
+		for (const FEnhancedActionKeyMapping& Mapping : Saved.MappingContext->GetMappings())
+		{
+			if (Mapping.Action == Saved.Action && Mapping.Key == Saved.OriginalKey)
 			{
-				OldKey = M.Key;
-				bFound = true;
+				bDefaultMappingAlreadyExists = true;
 				break;
 			}
 		}
 
-		if (bFound)
-		{
-			MappingContext->UnmapKey(MappingToApply.Action, OldKey);
-			MappingContext->MapKey(MappingToApply.Action, MappingToApply.MappedKey);
-		}
+		if (!bDefaultMappingAlreadyExists)
+			Saved.MappingContext->MapKey(Saved.Action, Saved.OriginalKey);
 	}
+
+	UGameplayStatics::DeleteGameInSlot(MappingSaveName, 0);
+	MappingSaveObj = Cast<UMappingSave>(UGameplayStatics::CreateSaveGameObject(UMappingSave::StaticClass()));
+	TriggerRefresh();
 }
 
 int32 UInputUtilitySubsystem::FindMappingInSavedArray(FSavedMapping NewMapping)

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Framework/Application/IInputProcessor.h"
+#include "Engine/World.h"
 #include "InputUtilitySubsystem.generated.h"
 
 class UMappingSave;
@@ -56,23 +57,34 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void TriggerRefresh();
 
+	UPROPERTY(BlueprintReadWrite)
+	bool bInProcessOfRemappingKey = false;
 private:
 	bool bUseAlternativeGamepadTextures = false;
 	TSharedPtr<FInputUtilitiesInputProcessor> InputProcessor;
+
 	
-	
+
 	//Saving
 public:
+	// Call before changing a mapping context to record the key that Reset should restore.
+	UFUNCTION(BlueprintCallable, Category="Input Utilities|Saving")
+	bool SaveOriginalMapping(UInputAction* Action, UInputMappingContext* MappingContext, bool bForGamepad);
 
 	UFUNCTION(BlueprintCallable)
 	void SaveMapping(FSavedMapping NewMapping);
 	UMappingSave* LoadMappingSaveObj();
 	void ApplyMappingSave(UMappingSave* MappingSave);
-	
-private:
+
+	UFUNCTION(BlueprintCallable)
+	void ResetMappingsToDefault();
+
+private:	
 	FString MappingSaveName = "Saved Input Mappings";
 	UMappingSave* MappingSaveObj = nullptr;
-	
+
+	void OnWorldTickStart(UWorld* InWorld, ELevelTick TickType, float DeltaSeconds);
+
 	//returns -1 if not found
 	int32 FindMappingInSavedArray(FSavedMapping NewMapping);
 };

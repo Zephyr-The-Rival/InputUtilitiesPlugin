@@ -14,14 +14,17 @@ struct FSavedMapping
 {
 	GENERATED_BODY()
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	UInputMappingContext* MappingContext;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	UInputAction* Action;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	FKey MappedKey;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	FKey OriginalKey;
 };
 
 UCLASS()
@@ -30,6 +33,6 @@ class INPUTUTILITIES_API UMappingSave : public USaveGame
 	GENERATED_BODY()
 	
 public:
-	UPROPERTY()
+	UPROPERTY(SaveGame)
 	TArray<FSavedMapping> SavedMappings;
 };
