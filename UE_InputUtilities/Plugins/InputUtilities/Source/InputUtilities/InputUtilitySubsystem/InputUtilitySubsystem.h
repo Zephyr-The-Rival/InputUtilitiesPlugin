@@ -82,6 +82,8 @@ public:
 
 private:
 	FString UserSettingsSaveSlotName = "Input User Settings";
+	
+	UPROPERTY()
 	UInputUserSettings* UserSettings = nullptr;
 
 	// The true default key for every binding in every context listed in
