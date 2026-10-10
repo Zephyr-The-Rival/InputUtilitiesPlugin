@@ -4,10 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "InputCoreTypes.h"
 #include "InputUserSettings.generated.h"
 
 class UInputAction;
 class UInputMappingContext;
+
 
 USTRUCT(BlueprintType)
 struct FSavedMapping

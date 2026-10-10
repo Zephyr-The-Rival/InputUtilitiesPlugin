@@ -4,6 +4,8 @@
 #include "InputUtilityWorldPrompt.h"
 #include "InputUtilities/FunctionLibrary/InputUtilitiesFunctionLibrary.h"
 #include "InputUtilities/InputUtilitySubsystem/InputUtilitySubsystem.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 
 // Sets default values
