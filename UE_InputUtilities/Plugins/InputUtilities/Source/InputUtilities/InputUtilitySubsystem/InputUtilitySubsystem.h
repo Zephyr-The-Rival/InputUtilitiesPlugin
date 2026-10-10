@@ -68,7 +68,10 @@ private:
 
 	//Saving
 public:
-	
+	// Call before changing a mapping context to record the key that Reset should restore.
+	UFUNCTION(BlueprintCallable, Category="Input Utilities|Saving")
+	bool SaveOriginalMapping(UInputAction* Action, UInputMappingContext* MappingContext, bool bForGamepad);
+
 	UFUNCTION(BlueprintCallable)
 	void SaveMapping(FSavedMapping NewMapping);
 	UInputUserSettings* LoadUserSettings();
