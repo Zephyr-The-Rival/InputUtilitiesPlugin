@@ -55,8 +55,10 @@ UTexture2D* UInputUtilitiesFunctionLibrary::GetTextureForMappedAction(UInputActi
 
 FKey UInputUtilitiesFunctionLibrary::GetMappedKeyForAction(UInputAction* Action, UInputMappingContext* MappingContext, bool bLookingForGamepadKey)
 {
-	TArray<FEnhancedActionKeyMapping> Mappings = MappingContext->GetMappings();
-	for (FEnhancedActionKeyMapping Mapping : Mappings)
+	if (!Action || !MappingContext)
+		return FKey();
+
+	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
 	{
 		if (Mapping.Action == Action && Mapping.Key.IsGamepadKey() == bLookingForGamepadKey)
 			return Mapping.Key;
