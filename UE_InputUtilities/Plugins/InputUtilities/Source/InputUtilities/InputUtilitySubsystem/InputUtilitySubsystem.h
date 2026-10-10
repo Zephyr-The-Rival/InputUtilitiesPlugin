@@ -6,9 +6,10 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Framework/Application/IInputProcessor.h"
 #include "Engine/World.h"
+#include "InputUtilities/Saving/InputUserSettings.h"
 #include "InputUtilitySubsystem.generated.h"
 
-class UMappingSave;
+class UInputUserSettings;
 struct FSavedMapping;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FReinitializePromptsEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAnyKeyPressedEvent, FKey, Key);
@@ -39,8 +40,8 @@ public:
 	bool bGamepadIsBeingUsed = false;
 	
 	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
-	bool GetUseAlternativeGamepadTextures() const {return this->bUseAlternativeGamepadTextures;}
-	
+	bool GetUseAlternativeGamepadTextures() const { return UserSettings ? UserSettings->bUseAlternativeGamepadTextures : false; }
+
 	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
 	void SetUseAlternativeGamepadTexture(bool bNewValue);
 
@@ -61,7 +62,6 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	bool bInProcessOfRemappingKey = false;
 private:
-	bool bUseAlternativeGamepadTextures = false;
 	TSharedPtr<FInputUtilitiesInputProcessor> InputProcessor;
 
 	
@@ -74,15 +74,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SaveMapping(FSavedMapping NewMapping);
-	UMappingSave* LoadMappingSaveObj();
-	void ApplyMappingSave(UMappingSave* MappingSave);
+	UInputUserSettings* LoadUserSettings();
+	void ApplyMappingSave(UInputUserSettings* Settings);
 
 	UFUNCTION(BlueprintCallable)
 	void ResetMappingsToDefault();
 
 private:
-	FString MappingSaveName = "Saved Input Mappings";
-	UMappingSave* MappingSaveObj = nullptr;
+	FString UserSettingsSaveSlotName = "Input User Settings";
+	UInputUserSettings* UserSettings = nullptr;
 
 	// The true default key for every binding in every context listed in
 	// UInputUtilitiesSettings. Captured once in Initialize(), before any saved

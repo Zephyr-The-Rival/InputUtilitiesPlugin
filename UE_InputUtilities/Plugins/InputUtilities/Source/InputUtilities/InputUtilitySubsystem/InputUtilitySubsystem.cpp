@@ -6,7 +6,7 @@
 #include "InputMappingContext.h"
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
-#include "InputUtilities/Saving/MappingSave.h"
+#include "InputUtilities/Saving/InputUserSettings.h"
 #include "InputUtilities/Settings/InputUtilitiesSettings.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -38,7 +38,7 @@ void UInputUtilitySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	InputProcessor = MakeShared<FInputUtilitiesInputProcessor>(this);
 	FSlateApplication::Get().RegisterInputPreProcessor(InputProcessor);
 
-	MappingSaveObj = LoadMappingSaveObj();
+	UserSettings = LoadUserSettings();
 	CaptureDefaultMappings();
 	FWorldDelegates::OnWorldTickStart.AddUObject(this, &UInputUtilitySubsystem::OnWorldTickStart);
 }
@@ -120,7 +120,7 @@ void UInputUtilitySubsystem::OnWorldTickStart(UWorld* InWorld, ELevelTick TickTy
 		return;
 
 	FWorldDelegates::OnWorldTickStart.RemoveAll(this);
-	ApplyMappingSave(MappingSaveObj);
+	ApplyMappingSave(UserSettings);
 }
 
 void UInputUtilitySubsystem::OnAnyKeyPressed(FKey Key)
@@ -141,7 +141,7 @@ void UInputUtilitySubsystem::TriggerRefresh()
 
 bool UInputUtilitySubsystem::SaveOriginalMapping(UInputAction* Action, UInputMappingContext* MappingContext, bool bForGamepad)
 {
-	if (!MappingSaveObj || !Action || !MappingContext)
+	if (!UserSettings || !Action || !MappingContext)
 		return false;
 
 	FSavedMapping OriginalMapping;
@@ -166,13 +166,13 @@ bool UInputUtilitySubsystem::SaveOriginalMapping(UInputAction* Action, UInputMap
 	if (FindMappingInSavedArray(OriginalMapping) != -1)
 		return true;
 
-	MappingSaveObj->SavedMappings.Add(OriginalMapping);
-	return UGameplayStatics::SaveGameToSlot(MappingSaveObj, MappingSaveName, 0);
+	UserSettings->SavedMappings.Add(OriginalMapping);
+	return UGameplayStatics::SaveGameToSlot(UserSettings, UserSettingsSaveSlotName, 0);
 }
 
 void UInputUtilitySubsystem::SaveMapping(FSavedMapping NewMapping)
 {
-	if (!MappingSaveObj || !NewMapping.Action || !NewMapping.MappingContext)
+	if (!UserSettings || !NewMapping.Action || !NewMapping.MappingContext)
 		return;
 
 	// OriginalKey always comes from the startup snapshot, never from the
@@ -189,26 +189,26 @@ void UInputUtilitySubsystem::SaveMapping(FSavedMapping NewMapping)
 
 	int32 ExistingIndex = FindMappingInSavedArray(NewMapping);
 	if (ExistingIndex != -1)
-		MappingSaveObj->SavedMappings.RemoveAt(ExistingIndex);
+		UserSettings->SavedMappings.RemoveAt(ExistingIndex);
 
-	MappingSaveObj->SavedMappings.Add(NewMapping);
-	UGameplayStatics::SaveGameToSlot(MappingSaveObj, MappingSaveName, 0);
+	UserSettings->SavedMappings.Add(NewMapping);
+	UGameplayStatics::SaveGameToSlot(UserSettings, UserSettingsSaveSlotName, 0);
 }
 
-UMappingSave* UInputUtilitySubsystem::LoadMappingSaveObj()
+UInputUserSettings* UInputUtilitySubsystem::LoadUserSettings()
 {
-	if (UGameplayStatics::DoesSaveGameExist(MappingSaveName, 0))
-		return Cast<UMappingSave>(UGameplayStatics::LoadGameFromSlot(MappingSaveName, 0));
+	if (UGameplayStatics::DoesSaveGameExist(UserSettingsSaveSlotName, 0))
+		return Cast<UInputUserSettings>(UGameplayStatics::LoadGameFromSlot(UserSettingsSaveSlotName, 0));
 	else
-		return Cast<UMappingSave>(UGameplayStatics::CreateSaveGameObject(UMappingSave::StaticClass()));
+		return Cast<UInputUserSettings>(UGameplayStatics::CreateSaveGameObject(UInputUserSettings::StaticClass()));
 }
 
-void UInputUtilitySubsystem::ApplyMappingSave(UMappingSave* MappingSave)
+void UInputUtilitySubsystem::ApplyMappingSave(UInputUserSettings* Settings)
 {
-	if (!MappingSave)
+	if (!Settings)
 		return;
 
-	for (const FSavedMapping& MappingToApply : MappingSave->SavedMappings)
+	for (const FSavedMapping& MappingToApply : Settings->SavedMappings)
 	{
 		UInputMappingContext* MappingContext = MappingToApply.MappingContext;
 		if (!MappingContext || !MappingToApply.Action || !MappingToApply.MappedKey.IsValid())
@@ -233,18 +233,20 @@ void UInputUtilitySubsystem::ResetMappingsToDefault()
 
 	RevertContextsToDefault();
 
-	UGameplayStatics::DeleteGameInSlot(MappingSaveName, 0);
-	MappingSaveObj = Cast<UMappingSave>(UGameplayStatics::CreateSaveGameObject(UMappingSave::StaticClass()));
+	// Only clear the key remaps, not the whole settings object - it may also
+	// hold unrelated preferences like bUseAlternativeGamepadTextures.
+	UserSettings->SavedMappings.Empty();
+	UGameplayStatics::SaveGameToSlot(UserSettings, UserSettingsSaveSlotName, 0);
 	TriggerRefresh();
 }
 
 int32 UInputUtilitySubsystem::FindMappingInSavedArray(FSavedMapping NewMapping)
 {
-	for (int i=0; i<MappingSaveObj->SavedMappings.Num(); i++)
+	for (int i=0; i<UserSettings->SavedMappings.Num(); i++)
 	{
-		if (MappingSaveObj->SavedMappings[i].Action == NewMapping.Action &&
-			MappingSaveObj->SavedMappings[i].MappingContext == NewMapping.MappingContext &&
-			MappingSaveObj->SavedMappings[i].MappedKey.IsGamepadKey() == NewMapping.MappedKey.IsGamepadKey())
+		if (UserSettings->SavedMappings[i].Action == NewMapping.Action &&
+			UserSettings->SavedMappings[i].MappingContext == NewMapping.MappingContext &&
+			UserSettings->SavedMappings[i].MappedKey.IsGamepadKey() == NewMapping.MappedKey.IsGamepadKey())
 		{
 			return i;
 		}
@@ -254,6 +256,10 @@ int32 UInputUtilitySubsystem::FindMappingInSavedArray(FSavedMapping NewMapping)
 
 void UInputUtilitySubsystem::SetUseAlternativeGamepadTexture(bool bNewValue)
 {
-	bUseAlternativeGamepadTextures = bNewValue;
+	if (!UserSettings)
+		return;
+
+	UserSettings->bUseAlternativeGamepadTextures = bNewValue;
+	UGameplayStatics::SaveGameToSlot(UserSettings, UserSettingsSaveSlotName, 0);
 	TriggerRefresh();
 }
