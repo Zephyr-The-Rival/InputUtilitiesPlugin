@@ -48,5 +48,6 @@ private:
 	UFUNCTION()
 	void InitializePrompt();
 	
+	UPROPERTY()
 	UMaterialInstanceDynamic* DynMat;
 };
