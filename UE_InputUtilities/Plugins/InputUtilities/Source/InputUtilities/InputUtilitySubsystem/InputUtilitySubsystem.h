@@ -24,6 +24,7 @@ public:
 
 	virtual bool HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override;
 	virtual bool HandleMouseButtonDownEvent(FSlateApplication& SlateApp, const FPointerEvent& MouseEvent) override;
+	virtual bool HandleMouseWheelOrGestureEvent(FSlateApplication& SlateApp, const FPointerEvent& InWheelEvent, const FPointerEvent* InGestureEvent) override;
 
 private:
 	TWeakObjectPtr<UInputUtilitySubsystem> Subsystem;
@@ -79,11 +80,20 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ResetMappingsToDefault();
 
-private:	
+private:
 	FString MappingSaveName = "Saved Input Mappings";
 	UMappingSave* MappingSaveObj = nullptr;
 
+	// The true default key for every binding in every context listed in
+	// UInputUtilitiesSettings. Captured once in Initialize(), before any saved
+	// remap is applied, so Reset and Deinitialize always have a reliable
+	// baseline to restore to (editor PIE sessions reuse the same in-memory
+	// context asset, so this must not be re-derived from runtime context state).
+	TArray<FSavedMapping> DefaultMappings;
+
 	void OnWorldTickStart(UWorld* InWorld, ELevelTick TickType, float DeltaSeconds);
+	void CaptureDefaultMappings();
+	void RevertContextsToDefault();
 
 	//returns -1 if not found
 	int32 FindMappingInSavedArray(FSavedMapping NewMapping);

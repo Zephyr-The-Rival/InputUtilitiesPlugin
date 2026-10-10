@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
 #include "InputUtilities/Saving/MappingSave.h"
+#include "InputUtilities/Settings/InputUtilitiesSettings.h"
 #include "Kismet/GameplayStatics.h"
 
 bool FInputUtilitiesInputProcessor::HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent)
@@ -23,6 +24,13 @@ bool FInputUtilitiesInputProcessor::HandleMouseButtonDownEvent(FSlateApplication
 	return false;
 }
 
+bool FInputUtilitiesInputProcessor::HandleMouseWheelOrGestureEvent(FSlateApplication& SlateApp, const FPointerEvent& InWheelEvent, const FPointerEvent* InGestureEvent)
+{
+	if (Subsystem.IsValid() && InWheelEvent.GetWheelDelta() != 0.f)
+		Subsystem->OnAnyKeyPressed(InWheelEvent.GetWheelDelta() > 0.f ? EKeys::MouseScrollUp : EKeys::MouseScrollDown);
+	return false;
+}
+
 void UInputUtilitySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -31,6 +39,7 @@ void UInputUtilitySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	FSlateApplication::Get().RegisterInputPreProcessor(InputProcessor);
 
 	MappingSaveObj = LoadMappingSaveObj();
+	CaptureDefaultMappings();
 	FWorldDelegates::OnWorldTickStart.AddUObject(this, &UInputUtilitySubsystem::OnWorldTickStart);
 }
 
@@ -38,10 +47,71 @@ void UInputUtilitySubsystem::Deinitialize()
 {
 	FWorldDelegates::OnWorldTickStart.RemoveAll(this);
 
+	// Editor PIE sessions keep reusing the same in-memory context assets, so
+	// put them back to default on shutdown. Otherwise the next session's
+	// "default" snapshot would just be whatever this session last applied.
+	RevertContextsToDefault();
+
 	if (FSlateApplication::IsInitialized() && InputProcessor.IsValid())
 		FSlateApplication::Get().UnregisterInputPreProcessor(InputProcessor);
 
 	Super::Deinitialize();
+}
+
+void UInputUtilitySubsystem::CaptureDefaultMappings()
+{
+	DefaultMappings.Empty();
+
+	const UInputUtilitiesSettings* Settings = GetDefault<UInputUtilitiesSettings>();
+	if (Settings->ManagedMappingContexts.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[InputUtilities] No Mapping Contexts configured in Project Settings > Plugins > Input Utilities. Remapping and Reset to Default will not work."));
+		return;
+	}
+
+	for (const TSoftObjectPtr<UInputMappingContext>& ContextPtr : Settings->ManagedMappingContexts)
+	{
+		UInputMappingContext* Context = ContextPtr.LoadSynchronous();
+		if (!Context)
+			continue;
+
+		for (const FEnhancedActionKeyMapping& M : Context->GetMappings())
+		{
+			FSavedMapping Default;
+			Default.Action = const_cast<UInputAction*>(M.Action.Get());
+			Default.MappingContext = Context;
+			Default.OriginalKey = M.Key;
+			Default.MappedKey = M.Key;
+			DefaultMappings.Add(Default);
+		}
+	}
+}
+
+void UInputUtilitySubsystem::RevertContextsToDefault()
+{
+	for (const FSavedMapping& Default : DefaultMappings)
+	{
+		if (!Default.MappingContext || !Default.Action)
+			continue;
+
+		FKey CurrentKey;
+		bool bFound = false;
+		for (const FEnhancedActionKeyMapping& M : Default.MappingContext->GetMappings())
+		{
+			if (M.Action == Default.Action && M.Key.IsGamepadKey() == Default.OriginalKey.IsGamepadKey())
+			{
+				CurrentKey = M.Key;
+				bFound = true;
+				break;
+			}
+		}
+
+		if (bFound && CurrentKey != Default.OriginalKey)
+		{
+			Default.MappingContext->UnmapKey(Default.Action, CurrentKey);
+			Default.MappingContext->MapKey(Default.Action, Default.OriginalKey);
+		}
+	}
 }
 
 void UInputUtilitySubsystem::OnWorldTickStart(UWorld* InWorld, ELevelTick TickType, float DeltaSeconds)
@@ -105,26 +175,21 @@ void UInputUtilitySubsystem::SaveMapping(FSavedMapping NewMapping)
 	if (!MappingSaveObj || !NewMapping.Action || !NewMapping.MappingContext)
 		return;
 
-	int32 ExistingIndex = FindMappingInSavedArray(NewMapping);
-	if (ExistingIndex != -1)
+	// OriginalKey always comes from the startup snapshot, never from the
+	// context's current (possibly already-remapped) state.
+	for (const FSavedMapping& Default : DefaultMappings)
 	{
-		// Preserve the original default key from the first save
-		NewMapping.OriginalKey = MappingSaveObj->SavedMappings[ExistingIndex].OriginalKey;
-		MappingSaveObj->SavedMappings.RemoveAt(ExistingIndex);
-	}
-	else if (!NewMapping.OriginalKey.IsValid())
-	{
-		// SaveMapping must be called before the caller changes the mapping context.
-		// At this point, the context still contains the default key we need for reset.
-		for (const FEnhancedActionKeyMapping& M : NewMapping.MappingContext->GetMappings())
+		if (Default.Action == NewMapping.Action && Default.MappingContext == NewMapping.MappingContext &&
+			Default.OriginalKey.IsGamepadKey() == NewMapping.MappedKey.IsGamepadKey())
 		{
-			if (M.Action == NewMapping.Action && M.Key.IsGamepadKey() == NewMapping.MappedKey.IsGamepadKey())
-			{
-				NewMapping.OriginalKey = M.Key;
-				break;
-			}
+			NewMapping.OriginalKey = Default.OriginalKey;
+			break;
 		}
 	}
+
+	int32 ExistingIndex = FindMappingInSavedArray(NewMapping);
+	if (ExistingIndex != -1)
+		MappingSaveObj->SavedMappings.RemoveAt(ExistingIndex);
 
 	MappingSaveObj->SavedMappings.Add(NewMapping);
 	UGameplayStatics::SaveGameToSlot(MappingSaveObj, MappingSaveName, 0);
@@ -165,29 +230,8 @@ void UInputUtilitySubsystem::ResetMappingsToDefault()
 {
 	if (bInProcessOfRemappingKey)
 		return;
-	
-	for (const FSavedMapping& Saved : MappingSaveObj->SavedMappings)
-	{
-		if (!Saved.MappingContext || !Saved.Action || !Saved.MappedKey.IsValid() || !Saved.OriginalKey.IsValid())
-			continue;
 
-		// Remove the exact user-selected key, rather than the first binding with
-		// the same device type. This keeps secondary bindings intact.
-		Saved.MappingContext->UnmapKey(Saved.Action, Saved.MappedKey);
-
-		bool bDefaultMappingAlreadyExists = false;
-		for (const FEnhancedActionKeyMapping& Mapping : Saved.MappingContext->GetMappings())
-		{
-			if (Mapping.Action == Saved.Action && Mapping.Key == Saved.OriginalKey)
-			{
-				bDefaultMappingAlreadyExists = true;
-				break;
-			}
-		}
-
-		if (!bDefaultMappingAlreadyExists)
-			Saved.MappingContext->MapKey(Saved.Action, Saved.OriginalKey);
-	}
+	RevertContextsToDefault();
 
 	UGameplayStatics::DeleteGameInSlot(MappingSaveName, 0);
 	MappingSaveObj = Cast<UMappingSave>(UGameplayStatics::CreateSaveGameObject(UMappingSave::StaticClass()));
@@ -211,4 +255,5 @@ int32 UInputUtilitySubsystem::FindMappingInSavedArray(FSavedMapping NewMapping)
 void UInputUtilitySubsystem::SetUseAlternativeGamepadTexture(bool bNewValue)
 {
 	bUseAlternativeGamepadTextures = bNewValue;
+	TriggerRefresh();
 }

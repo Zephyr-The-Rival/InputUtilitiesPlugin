@@ -50,7 +50,7 @@ UTexture2D* UInputUtilitiesFunctionLibrary::GetTextureForMappedAction(UInputActi
 		}
 	}
 
-	return nullptr;
+	return LoadObject<UTexture2D>(nullptr, TEXT("/InputUtilities/Textures/Errors/T_NoTextureAvailable.T_NoTextureAvailable"));
 }
 
 FKey UInputUtilitiesFunctionLibrary::GetMappedKeyForAction(UInputAction* Action, UInputMappingContext* MappingContext, bool bLookingForGamepadKey)
