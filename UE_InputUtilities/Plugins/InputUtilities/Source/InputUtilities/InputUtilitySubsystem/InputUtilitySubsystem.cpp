@@ -80,7 +80,6 @@ void UInputUtilitySubsystem::CaptureDefaultMappings()
 			FSavedMapping Default;
 			Default.Action = const_cast<UInputAction*>(M.Action.Get());
 			Default.MappingContext = Context;
-			Default.OriginalKey = M.Key;
 			Default.MappedKey = M.Key;
 			DefaultMappings.Add(Default);
 		}
@@ -98,7 +97,7 @@ void UInputUtilitySubsystem::RevertContextsToDefault()
 		bool bFound = false;
 		for (const FEnhancedActionKeyMapping& M : Default.MappingContext->GetMappings())
 		{
-			if (M.Action == Default.Action && M.Key.IsGamepadKey() == Default.OriginalKey.IsGamepadKey())
+			if (M.Action == Default.Action && M.Key.IsGamepadKey() == Default.MappedKey.IsGamepadKey())
 			{
 				CurrentKey = M.Key;
 				bFound = true;
@@ -106,10 +105,10 @@ void UInputUtilitySubsystem::RevertContextsToDefault()
 			}
 		}
 
-		if (bFound && CurrentKey != Default.OriginalKey)
+		if (bFound && CurrentKey != Default.MappedKey)
 		{
 			Default.MappingContext->UnmapKey(Default.Action, CurrentKey);
-			Default.MappingContext->MapKey(Default.Action, Default.OriginalKey);
+			Default.MappingContext->MapKey(Default.Action, Default.MappedKey);
 		}
 	}
 }
@@ -139,53 +138,10 @@ void UInputUtilitySubsystem::TriggerRefresh()
 	ReinitializePrompts.Broadcast();
 }
 
-bool UInputUtilitySubsystem::SaveOriginalMapping(UInputAction* Action, UInputMappingContext* MappingContext, bool bForGamepad)
-{
-	if (!UserSettings || !Action || !MappingContext)
-		return false;
-
-	FSavedMapping OriginalMapping;
-	OriginalMapping.Action = Action;
-	OriginalMapping.MappingContext = MappingContext;
-
-	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
-	{
-		if (Mapping.Action == Action && Mapping.Key.IsGamepadKey() == bForGamepad)
-		{
-			OriginalMapping.OriginalKey = Mapping.Key;
-			OriginalMapping.MappedKey = Mapping.Key;
-			break;
-		}
-	}
-
-	if (!OriginalMapping.OriginalKey.IsValid())
-		return false;
-
-	// Defaults are captured only once. SaveMapping will replace this placeholder
-	// with the player's new key while retaining OriginalKey.
-	if (FindMappingInSavedArray(OriginalMapping) != -1)
-		return true;
-
-	UserSettings->SavedMappings.Add(OriginalMapping);
-	return UGameplayStatics::SaveGameToSlot(UserSettings, UserSettingsSaveSlotName, 0);
-}
-
 void UInputUtilitySubsystem::SaveMapping(FSavedMapping NewMapping)
 {
 	if (!UserSettings || !NewMapping.Action || !NewMapping.MappingContext)
 		return;
-
-	// OriginalKey always comes from the startup snapshot, never from the
-	// context's current (possibly already-remapped) state.
-	for (const FSavedMapping& Default : DefaultMappings)
-	{
-		if (Default.Action == NewMapping.Action && Default.MappingContext == NewMapping.MappingContext &&
-			Default.OriginalKey.IsGamepadKey() == NewMapping.MappedKey.IsGamepadKey())
-		{
-			NewMapping.OriginalKey = Default.OriginalKey;
-			break;
-		}
-	}
 
 	int32 ExistingIndex = FindMappingInSavedArray(NewMapping);
 	if (ExistingIndex != -1)
@@ -214,12 +170,23 @@ void UInputUtilitySubsystem::ApplyMappingSave(UInputUserSettings* Settings)
 		if (!MappingContext || !MappingToApply.Action || !MappingToApply.MappedKey.IsValid())
 			continue;
 
-		// The original key identifies the exact mapping to replace.  Matching only
-		// by keyboard/gamepad type would replace the wrong binding when an action
-		// has multiple keyboard or controller bindings.
-		if (MappingToApply.OriginalKey.IsValid())
+		// Find the current default key for this binding, so we know which key to
+		// replace. Matching only by keyboard/gamepad type would replace the wrong
+		// binding when an action has multiple keyboard or controller bindings.
+		FKey KeyToReplace;
+		for (const FSavedMapping& Default : DefaultMappings)
 		{
-			MappingContext->UnmapKey(MappingToApply.Action, MappingToApply.OriginalKey);
+			if (Default.Action == MappingToApply.Action && Default.MappingContext == MappingContext &&
+				Default.MappedKey.IsGamepadKey() == MappingToApply.MappedKey.IsGamepadKey())
+			{
+				KeyToReplace = Default.MappedKey;
+				break;
+			}
+		}
+
+		if (KeyToReplace.IsValid())
+		{
+			MappingContext->UnmapKey(MappingToApply.Action, KeyToReplace);
 			MappingContext->MapKey(MappingToApply.Action, MappingToApply.MappedKey);
 		}
 	}

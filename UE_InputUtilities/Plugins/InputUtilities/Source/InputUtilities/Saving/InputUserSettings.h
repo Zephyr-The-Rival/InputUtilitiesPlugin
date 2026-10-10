@@ -22,9 +22,6 @@ struct FSavedMapping
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	FKey MappedKey;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
-	FKey OriginalKey;
 };
 
 // Persisted per-player input preferences: key remaps and misc settings like
