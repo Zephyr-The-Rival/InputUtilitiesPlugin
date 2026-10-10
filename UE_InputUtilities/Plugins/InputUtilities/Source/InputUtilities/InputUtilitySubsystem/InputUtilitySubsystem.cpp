@@ -80,7 +80,6 @@ void UInputUtilitySubsystem::CaptureDefaultMappings()
 			FSavedMapping Default;
 			Default.Action = const_cast<UInputAction*>(M.Action.Get());
 			Default.MappingContext = Context;
-			Default.OriginalKey = M.Key;
 			Default.MappedKey = M.Key;
 			DefaultMappings.Add(Default);
 		}
@@ -137,37 +136,6 @@ void UInputUtilitySubsystem::OnAnyKeyPressed(FKey Key)
 void UInputUtilitySubsystem::TriggerRefresh()
 {
 	ReinitializePrompts.Broadcast();
-}
-
-bool UInputUtilitySubsystem::SaveOriginalMapping(UInputAction* Action, UInputMappingContext* MappingContext, bool bForGamepad)
-{
-	if (!UserSettings || !Action || !MappingContext)
-		return false;
-
-	FSavedMapping OriginalMapping;
-	OriginalMapping.Action = Action;
-	OriginalMapping.MappingContext = MappingContext;
-
-	for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
-	{
-		if (Mapping.Action == Action && Mapping.Key.IsGamepadKey() == bForGamepad)
-		{
-			OriginalMapping.OriginalKey = Mapping.Key;
-			OriginalMapping.MappedKey = Mapping.Key;
-			break;
-		}
-	}
-
-	if (!OriginalMapping.OriginalKey.IsValid())
-		return false;
-
-	// Defaults are captured only once. SaveMapping will replace this placeholder
-	// with the player's new key while retaining OriginalKey.
-	if (FindMappingInSavedArray(OriginalMapping) != -1)
-		return true;
-
-	UserSettings->SavedMappings.Add(OriginalMapping);
-	return UGameplayStatics::SaveGameToSlot(UserSettings, UserSettingsSaveSlotName, 0);
 }
 
 void UInputUtilitySubsystem::SaveMapping(FSavedMapping NewMapping)
