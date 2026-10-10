@@ -20,6 +20,6 @@ protected:
 
 	
 	//override in children
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
 	virtual void Reinitialize();
 };

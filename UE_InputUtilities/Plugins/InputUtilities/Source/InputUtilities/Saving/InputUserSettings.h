@@ -14,13 +14,13 @@ struct FSavedMapping
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "InputUtilities")
 	UInputMappingContext* MappingContext;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "InputUtilities")
 	UInputAction* Action;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "InputUtilities")
 	FKey MappedKey;
 };
 

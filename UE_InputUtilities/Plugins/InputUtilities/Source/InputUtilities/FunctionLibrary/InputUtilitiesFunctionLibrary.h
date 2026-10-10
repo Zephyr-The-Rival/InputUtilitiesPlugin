@@ -16,13 +16,13 @@ struct FKeyTextures : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Utilities")
 	FKey Key;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Utilities")
 	TSoftObjectPtr<UTexture2D> KeyTexture;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Utilities")
 	TSoftObjectPtr<UTexture2D> AltTexture;
 };
 

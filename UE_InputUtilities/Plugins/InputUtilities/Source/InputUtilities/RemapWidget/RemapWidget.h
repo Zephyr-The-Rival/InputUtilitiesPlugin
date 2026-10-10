@@ -15,22 +15,22 @@ class INPUTUTILITIES_API URemapWidget : public UInputUtility_RefreshingWidget
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Prompt")
 	UInputAction* Action = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Prompt")
 	UInputMappingContext* MappingContext = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Prompt")
 	bool bRemappingForGamepad = false;
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
 	UTexture2D* GetActionTexture();
-	
+
 protected:
 	virtual void Reinitialize() override;
-	
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Input Utilities")
 	void Refresh();
 	void Refresh_Implementation();
 };

@@ -9,6 +9,7 @@
 class UInputAction;
 class UInputMappingContext;
 class UTexture2D;
+class UMaterialInstanceDynamic;
 
 UCLASS(Blueprintable)
 class INPUTUTILITIES_API AInputUtilityWorldPrompt : public AActor

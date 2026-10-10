@@ -56,10 +56,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Input Utilities")
 	FOnAnyKeyPressedEvent OnAnyKeyPressedEvent;
 	
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities")
 	void TriggerRefresh();
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite, Category = "Input Utilities")
 	bool bInProcessOfRemappingKey = false;
 private:
 	TSharedPtr<FInputUtilitiesInputProcessor> InputProcessor;
@@ -68,12 +68,12 @@ private:
 
 	//Saving
 public:
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities|Saving")
 	void SaveMapping(FSavedMapping NewMapping);
 	UInputUserSettings* LoadUserSettings();
 	void ApplyMappingSave(UInputUserSettings* Settings);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = "Input Utilities|Saving")
 	void ResetMappingsToDefault();
 
 private:
