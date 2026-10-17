@@ -69,18 +69,20 @@ void UInputUtilitySubsystem::CaptureDefaultMappings()
 		return;
 	}
 
-	for (const TSoftObjectPtr<UInputMappingContext>& ContextPtr : Settings->ManagedMappingContexts)
+	for (const TSoftObjectPtr<UInputMappingContext>& ManagedMappingContextRef : Settings->ManagedMappingContexts)
 	{
-		UInputMappingContext* Context = ContextPtr.LoadSynchronous();
-		if (!Context)
+		UInputMappingContext* ManagedMappingContext = ManagedMappingContextRef.LoadSynchronous();
+		if (!ManagedMappingContext)
 			continue;
 
-		for (const FEnhancedActionKeyMapping& M : Context->GetMappings())
+		for (const FEnhancedActionKeyMapping& M : ManagedMappingContext->GetMappings())
 		{
 			FSavedMapping Default;
 			Default.Action = const_cast<UInputAction*>(M.Action.Get());
-			Default.MappingContext = Context;
+			Default.MappingContext = ManagedMappingContext;
 			Default.MappedKey = M.Key;
+			Default.Modifiers = M.Modifiers;
+			Default.Triggers = M.Triggers;
 			DefaultMappings.Add(Default);
 		}
 	}
@@ -88,27 +90,33 @@ void UInputUtilitySubsystem::CaptureDefaultMappings()
 
 void UInputUtilitySubsystem::RevertContextsToDefault()
 {
+	// Rebuild every action's bindings from scratch instead of patching individual
+	// key rows. Actions with multiple same-device bindings (e.g. WASD movement,
+	// where all four keys share one Action) can't be identified by Action +
+	// device type alone - patching one row at a time ends up swapping/duplicating
+	// the wrong key and losing the per-key Modifiers (Swizzle/Negate etc).
+	TArray<TPair<UInputMappingContext*, UInputAction*>> ProcessedActions;
+
 	for (const FSavedMapping& Default : DefaultMappings)
 	{
 		if (!Default.MappingContext || !Default.Action)
 			continue;
 
-		FKey CurrentKey;
-		bool bFound = false;
-		for (const FEnhancedActionKeyMapping& M : Default.MappingContext->GetMappings())
-		{
-			if (M.Action == Default.Action && M.Key.IsGamepadKey() == Default.MappedKey.IsGamepadKey())
-			{
-				CurrentKey = M.Key;
-				bFound = true;
-				break;
-			}
-		}
+		TPair<UInputMappingContext*, UInputAction*> ActionKey(Default.MappingContext, Default.Action);
+		if (ProcessedActions.Contains(ActionKey))
+			continue;
+		ProcessedActions.Add(ActionKey);
 
-		if (bFound && CurrentKey != Default.MappedKey)
+		Default.MappingContext->UnmapAllKeysFromAction(Default.Action);
+
+		for (const FSavedMapping& Slot : DefaultMappings)
 		{
-			Default.MappingContext->UnmapKey(Default.Action, CurrentKey);
-			Default.MappingContext->MapKey(Default.Action, Default.MappedKey);
+			if (Slot.MappingContext != Default.MappingContext || Slot.Action != Default.Action)
+				continue;
+
+			FEnhancedActionKeyMapping& NewEntry = Slot.MappingContext->MapKey(Slot.Action, Slot.MappedKey);
+			NewEntry.Modifiers = Slot.Modifiers;
+			NewEntry.Triggers = Slot.Triggers;
 		}
 	}
 }
@@ -170,24 +178,28 @@ void UInputUtilitySubsystem::ApplyMappingSave(UInputUserSettings* Settings)
 		if (!MappingContext || !MappingToApply.Action || !MappingToApply.MappedKey.IsValid())
 			continue;
 
-		// Find the current default key for this binding, so we know which key to
-		// replace. Matching only by keyboard/gamepad type would replace the wrong
-		// binding when an action has multiple keyboard or controller bindings.
-		FKey KeyToReplace;
+		// Find the default slot this remap replaces, so we know which key to
+		// replace and which Modifiers/Triggers to carry over. Matching only by
+		// keyboard/gamepad type can't disambiguate an action with multiple
+		// same-device bindings (e.g. WASD) - this is a known limitation for
+		// those actions until saved remaps carry their own slot identifier.
+		const FSavedMapping* MatchedDefault = nullptr;
 		for (const FSavedMapping& Default : DefaultMappings)
 		{
 			if (Default.Action == MappingToApply.Action && Default.MappingContext == MappingContext &&
 				Default.MappedKey.IsGamepadKey() == MappingToApply.MappedKey.IsGamepadKey())
 			{
-				KeyToReplace = Default.MappedKey;
+				MatchedDefault = &Default;
 				break;
 			}
 		}
 
-		if (KeyToReplace.IsValid())
+		if (MatchedDefault)
 		{
-			MappingContext->UnmapKey(MappingToApply.Action, KeyToReplace);
-			MappingContext->MapKey(MappingToApply.Action, MappingToApply.MappedKey);
+			MappingContext->UnmapKey(MappingToApply.Action, MatchedDefault->MappedKey);
+			FEnhancedActionKeyMapping& NewEntry = MappingContext->MapKey(MappingToApply.Action, MappingToApply.MappedKey);
+			NewEntry.Modifiers = MatchedDefault->Modifiers;
+			NewEntry.Triggers = MatchedDefault->Triggers;
 		}
 	}
 	TriggerRefresh();

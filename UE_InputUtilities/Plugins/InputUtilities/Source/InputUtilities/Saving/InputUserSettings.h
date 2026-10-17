@@ -9,7 +9,8 @@
 
 class UInputAction;
 class UInputMappingContext;
-
+class UInputModifier;
+class UInputTrigger;
 
 USTRUCT(BlueprintType)
 struct FSavedMapping
@@ -24,6 +25,16 @@ struct FSavedMapping
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "InputUtilities")
 	FKey MappedKey;
+
+	// Only populated for DefaultMappings entries (not persisted): the modifiers
+	// and triggers this binding had in the Input Mapping Context asset. Needed
+	// to restore composite-axis bindings (e.g. WASD's Swizzle/Negate) correctly -
+	// MapKey() alone creates a mapping with none of these.
+	UPROPERTY()
+	TArray<TObjectPtr<UInputModifier>> Modifiers;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UInputTrigger>> Triggers;
 };
 
 // Persisted per-player input preferences: key remaps and misc settings like
