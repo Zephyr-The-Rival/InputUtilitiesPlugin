@@ -29,7 +29,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input Prompt")
+	UPROPERTY(EditDefaultsOnly, Category="Input Prompt")
 	UStaticMeshComponent* Plane;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Input Prompt")
